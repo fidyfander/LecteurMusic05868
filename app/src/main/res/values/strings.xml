@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lecteur Music</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="play_pause">Play/Pause</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="no_music">No music playing</string>
+    <string name="permission_required">Permission required</string>
+    <string name="current_song">Current song</string>
+    <string name="search_hint">Rechercher une musique...</string>
+    <string name="default_song_title">Sélectionnez une chanson</string>
+</resources>

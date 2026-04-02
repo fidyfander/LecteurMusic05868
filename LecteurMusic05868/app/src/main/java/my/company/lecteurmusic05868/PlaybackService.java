@@ -1,0 +1,250 @@
+package my.company.lecteurmusic05868;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Binder;
+import android.os.Build;
+import android.os.Handler;
+import android.os.IBinder;
+import android.widget.Toast;
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class PlaybackService extends Service {
+    private MediaPlayer mediaPlayer;
+    private List<MusicItem> musicItems;
+    private int currentSongIndex = 0;
+    private boolean isPlaying = false;
+    private Handler handler = new Handler();
+    
+    // Constantes
+    public static final String ACTION_PLAY = "PLAY";
+    public static final String ACTION_PAUSE = "PAUSE";
+    public static final String ACTION_NEXT = "NEXT";
+    public static final String ACTION_PREVIOUS = "PREVIOUS";
+    public static final String ACTION_UPDATE = "UPDATE";
+    public static final String CHANNEL_ID = "MusicPlaybackChannel";
+    public static final int NOTIFICATION_ID = 1;
+    
+    private final IBinder binder = new LocalBinder();
+    
+    public class LocalBinder extends Binder {
+        PlaybackService getService() {
+            return PlaybackService.this;
+        }
+    }
+    
+    private static class MusicItem {
+        Uri uri;
+        String name;
+        
+        MusicItem(Uri uri, String name) {
+            this.uri = uri;
+            this.name = name;
+        }
+    }
+    
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        mediaPlayer = new MediaPlayer();
+        musicItems = new ArrayList<>();
+        setupMediaPlayerCallbacks();
+        createNotificationChannel();
+        registerReceiver(notificationReceiver, new IntentFilter(ACTION_UPDATE));
+    }
+    
+    private void setupMediaPlayerCallbacks() {
+        mediaPlayer.setOnCompletionListener(mp -> playNext());
+        mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+            Toast.makeText(this, "Erreur lecture", Toast.LENGTH_SHORT).show();
+            return true;
+        });
+    }
+    
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Lecture musique",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+    
+    private void startForegroundNotification() {
+        Intent intent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Lecteur Music")
+            .setContentText("Musique en cours...")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build();
+        
+        startForeground(NOTIFICATION_ID, notification);
+    }
+    
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.getAction() != null) {
+            String action = intent.getAction();
+            switch (action) {
+                case ACTION_PLAY:
+                    play();
+                    break;
+                case ACTION_PAUSE:
+                    pause();
+                    break;
+                case ACTION_NEXT:
+                    playNext();
+                    break;
+                case ACTION_PREVIOUS:
+                    playPrevious();
+                    break;
+            }
+        }
+        return START_STICKY;
+    }
+    
+    public void setMusicList(List<MusicItem> items) {
+        this.musicItems = new ArrayList<>(items);
+    }
+    
+    public void playSong(int index) {
+        if (musicItems == null || musicItems.isEmpty() || index < 0 || index >= musicItems.size()) return;
+        
+        try {
+            currentSongIndex = index;
+            mediaPlayer.reset();
+            MusicItem item = musicItems.get(currentSongIndex);
+            mediaPlayer.setDataSource(this, item.uri);
+            mediaPlayer.prepareAsync();
+            mediaPlayer.setOnPreparedListener(mp -> {
+                mp.start();
+                isPlaying = true;
+                updateNotification();
+                sendBroadcastUpdate();
+                startForegroundNotification();
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Erreur lecture", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    public void play() {
+        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+            mediaPlayer.start();
+            isPlaying = true;
+            updateNotification();
+            sendBroadcastUpdate();
+        }
+    }
+    
+    public void pause() {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+            isPlaying = false;
+            updateNotification();
+            sendBroadcastUpdate();
+        }
+    }
+    
+    public void playNext() {
+        if (musicItems != null && !musicItems.isEmpty()) {
+            currentSongIndex = (currentSongIndex + 1) % musicItems.size();
+            playSong(currentSongIndex);
+        }
+    }
+    
+    public void playPrevious() {
+        if (musicItems != null && !musicItems.isEmpty()) {
+            currentSongIndex = (currentSongIndex - 1 + musicItems.size()) % musicItems.size();
+            playSong(currentSongIndex);
+        }
+    }
+    
+    public boolean isPlaying() {
+        return isPlaying;
+    }
+    
+    public int getCurrentPosition() {
+        return mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+    }
+    
+    public int getDuration() {
+        return mediaPlayer != null ? mediaPlayer.getDuration() : 0;
+    }
+    
+    public void seekTo(int position) {
+        if (mediaPlayer != null) {
+            mediaPlayer.seekTo(position);
+        }
+    }
+    
+    private void updateNotification() {
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Lecteur Music")
+            .setContentText(musicItems.get(currentSongIndex).name)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build();
+        
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, notification);
+        }
+    }
+    
+    private void sendBroadcastUpdate() {
+        Intent intent = new Intent(ACTION_UPDATE);
+        intent.putExtra("isPlaying", isPlaying);
+        intent.putExtra("currentPosition", getCurrentPosition());
+        intent.putExtra("duration", getDuration());
+        intent.putExtra("songTitle", musicItems.get(currentSongIndex).name);
+        sendBroadcast(intent);
+    }
+    
+    private final BroadcastReceiver notificationReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            sendBroadcastUpdate();
+        }
+    };
+    
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return binder;
+    }
+    
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+        unregisterReceiver(notificationReceiver);
+        handler.removeCallbacksAndMessages(null);
+    }
+}
