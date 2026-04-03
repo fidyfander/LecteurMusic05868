@@ -5,10 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Binder;
@@ -63,7 +61,6 @@ public class PlaybackService extends Service {
         musicItems = new ArrayList<>();
         setupMediaPlayerCallbacks();
         createNotificationChannel();
-        registerReceiver(notificationReceiver, new IntentFilter(ACTION_UPDATE));
     }
     
     private void setupMediaPlayerCallbacks() {
@@ -216,6 +213,7 @@ public class PlaybackService extends Service {
     }
     
     private void sendBroadcastUpdate() {
+        if (musicItems == null || musicItems.isEmpty()) return;
         Intent intent = new Intent(ACTION_UPDATE);
         intent.putExtra("isPlaying", isPlaying);
         intent.putExtra("currentPosition", getCurrentPosition());
@@ -223,13 +221,6 @@ public class PlaybackService extends Service {
         intent.putExtra("songTitle", musicItems.get(currentSongIndex).name);
         sendBroadcast(intent);
     }
-    
-    private final BroadcastReceiver notificationReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            sendBroadcastUpdate();
-        }
-    };
     
     @Nullable
     @Override
@@ -244,7 +235,6 @@ public class PlaybackService extends Service {
             mediaPlayer.release();
             mediaPlayer = null;
         }
-        unregisterReceiver(notificationReceiver);
         handler.removeCallbacksAndMessages(null);
     }
 }

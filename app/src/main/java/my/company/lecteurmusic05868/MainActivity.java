@@ -14,7 +14,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
-import android.widget.SearchView;
+import androidx.appcompat.widget.SearchView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -249,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
         mediaPlayer.setOnPreparedListener(mp -> {
             if (isPlaying) {
                 mp.start();
-                btnPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+                        btnPlayPause.setImageResource(R.drawable.ic_pause);
             }
             
             int duration = mp.getDuration();
@@ -293,12 +293,12 @@ public class MainActivity extends AppCompatActivity {
         
         if (mediaPlayer.isPlaying()) {
             mediaPlayer.pause();
-            btnPlayPause.setImageResource(android.R.drawable.ic_media_play);
+            btnPlayPause.setImageResource(R.drawable.ic_play);
             isPlaying = false;
             handler.removeCallbacksAndMessages(null);
         } else {
             mediaPlayer.start();
-            btnPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+            btnPlayPause.setImageResource(R.drawable.ic_pause);
             isPlaying = true;
             updateSeekBar();
         }
